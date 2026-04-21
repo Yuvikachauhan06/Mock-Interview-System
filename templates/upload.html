@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mock Interview System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f5f5;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 24px;
+      font-weight: normal;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    input[type="file"],
+    select,
+    input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    input[type="file"]:focus,
+    select:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Mock Interview System</h2>
+
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="resume">Upload Resume (PDF/DOC)</label>
+      <input type="file" name="resume" id="resume" required>
+    </div>
+
+    <div class="form-group">
+      <label for="role">Select Role</label>
+      <select name="role" id="role" required>
+        <option>Software Engineer</option>
+        <option>Backend Developer</option>
+        <option>Frontend Developer</option>
+        <option>Full-Stack Developer</option>
+        <option>Data Scientist</option>
+        <option>Machine Learning Engineer</option>
+        <option>Database Engineer</option>
+        <option>Cybersecurity Engineer</option>
+        <option>Cloud / DevOps Engineer</option>
+        <option>Core CS / Research</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="num_q">Number of Questions (1-10)</label>
+      <input type="number" name="num_q" id="num_q" value="5" min="1" max="10">
+    </div>
+
+    <button type="submit">Start Interview</button>
+  </form>
+</div>
+
+</body>
+</html>

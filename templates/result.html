@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Interview Results</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f5f5;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Headers */
+    h2 {
+      color: #333;
+      font-size: 28px;
+      font-weight: normal;
+      margin-bottom: 25px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #4CAF50;
+    }
+
+    h3 {
+      color: #555;
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    /* Score Card */
+    .score {
+      background: white;
+      padding: 30px;
+      text-align: center;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      font-size: 32px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+
+    /* Common card style */
+    .analysis, .suggestions, .insights {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* Lists */
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    li {
+      padding: 10px 0;
+      color: #555;
+      border-bottom: 1px solid #eee;
+    }
+
+    li:last-child {
+      border-bottom: none;
+    }
+
+    li b {
+      color: #333;
+      min-width: 150px;
+      display: inline-block;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 25px;
+    }
+
+    th {
+      background: #4CAF50;
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+      color: #555;
+      font-size: 14px;
+    }
+
+    tr:hover {
+      background: #f9f9f9;
+    }
+
+    /* Prediction colors */
+    td:first-child {
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* Charts */
+    .chart-container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .chart-container img {
+      max-width: 100%;
+      height: auto;
+      margin-top: 15px;
+    }
+
+    /* Two column layout for charts */
+    .charts-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      margin-bottom: 25px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      body {
+        padding: 20px 15px;
+      }
+      
+      h2 {
+        font-size: 24px;
+      }
+      
+      .charts-wrapper {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      table {
+        font-size: 12px;
+      }
+      
+      th, td {
+        padding: 8px;
+      }
+      
+      li b {
+        min-width: 120px;
+      }
+      
+      .score {
+        font-size: 24px;
+        padding: 20px;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: white;
+        padding: 20px;
+      }
+      
+      .score {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+      
+      .analysis, .suggestions, .insights, .chart-container, table {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+      
+      th {
+        background: #ddd;
+        color: black;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Interview Results</h2>
+
+  <!-- Overall Score -->
+  <div class="score">Overall Score: {{ overall_score }}%</div>
+
+  <!-- Strengths & Weaknesses -->
+  <div class="analysis">
+    <h3>Domain Analysis</h3>
+    <ul>
+      {% for domain, level in analysis.items() %}
+        <li><b>{{ domain }}</b>: {{ level }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Suggestions -->
+  <div class="suggestions">
+    <h3>Domain Suggestions</h3>
+    <ul>
+      {% for domain, suggestion in domain_suggestions.items() %}
+        <li><b>{{ domain }}</b>: {{ suggestion }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Insights -->
+  <div class="insights">
+    <h3>Insights</h3>
+    <ul>
+      {% for i in insights %}
+        <li>{{ i }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <!-- Detailed Results Table -->
+  <h3>Detailed Results</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Domain</th>
+        <th>Prediction</th>
+        <th>Confidence (%)</th>
+        <th>Similarity</th>
+        <th>Keywords</th>
+        <th>Length</th>
+        <th>Filler Words</th>
+        <th>Technical Depth</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.domain }}</td>
+        <td>{{ r.prediction }}</td>
+        <td>{{ r.confidence }}</td>
+        <td>{{ r.similarity }}</td>
+        <td>{{ r.keywords }}</td>
+        <td>{{ r.length }}</td>
+        <td>{{ r.filler }}</td>
+        <td>{{ r.depth }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Charts -->
+  <div class="charts-wrapper">
+    <div class="chart-container">
+      <h3>Domain-wise Performance (Pie Chart)</h3>
+      <img src="{{ url_for('static', filename='domain_pie.png') }}" alt="Pie Chart">
+    </div>
+
+    <div class="chart-container">
+      <h3>Domain-wise Performance (Bar Chart)</h3>
+      <img src="{{ url_for('static', filename='domain_bar.png') }}" alt="Bar Chart">
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

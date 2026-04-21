@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Answer Questions - Mock Interview</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f5f5;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 24px;
+      font-weight: normal;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .question-item {
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+
+    .question-text {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .domain-tag {
+      display: inline-block;
+      background: #e0e0e0;
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    .progress {
+      background: #f0f0f0;
+      height: 4px;
+      margin-bottom: 25px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      background: #4CAF50;
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .question-number {
+      color: #999;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Answer the Questions</h2>
+  <div class="subtitle">Please provide detailed answers for each question</div>
+
+  <div class="progress">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <form action="/evaluate" method="post">
+    {% for q in questions %}
+    <div class="question-item">
+      <div class="question-number">Question {{ loop.index }}</div>
+      <div class="domain-tag">{{ q['domain'] }}</div>
+      <div class="question-text">{{ q['question'] }}</div>
+      
+      <label>Your Answer:</label>
+      <textarea name="answer{{ loop.index }}" rows="5" required placeholder="Type your answer here..."></textarea>
+      
+      <input type="hidden" name="domain{{ loop.index }}" value="{{ q['domain'] }}">
+      <input type="hidden" name="ideal{{ loop.index }}" value="{{ q['ideal_answer'] }}">
+      <input type="hidden" name="keywords{{ loop.index }}" value="{{ q['keywords'] }}">
+    </div>
+    {% endfor %}
+    
+    <button type="submit">Submit Answers</button>
+  </form>
+</div>
+
+<script>
+  const total = {{ questions|length }};
+  const textareas = document.querySelectorAll('textarea');
+  
+  function updateProgress() {
+    let answered = 0;
+    textareas.forEach(ta => {
+      if (ta.value.trim().length > 0) answered++;
+    });
+    const percent = (answered / total) * 100;
+    document.getElementById('progressBar').style.width = percent + '%';
+  }
+  
+  textareas.forEach(ta => ta.addEventListener('input', updateProgress));
+  updateProgress();
+</script>
+
+</body>
+</html>
