@@ -266,23 +266,37 @@ def evaluate():
     scores = list(domain_chart.values())
 
     # Pie chart
-    plt.figure(figsize=(6,6))
-    plt.pie(scores, labels=labels, autopct='%1.1f%%', startangle=140)
-    plt.title("Domain-wise Performance")
-    plt.tight_layout()
-    plt.savefig("static/domain_pie.png")
-    plt.close()
-
+    if scores and sum(scores) > 0:
+        plt.figure(figsize=(6,6))
+        plt.pie(scores, labels=labels, autopct='%1.1f%%', startangle=140)
+        plt.title("Domain-wise Performance")
+        plt.tight_layout()
+        plt.savefig("static/domain_pie.png")
+        plt.close()
+    else:
+        plt.figure(figsize=(6,6))
+        plt.text(0.5, 0.5, "No data available", ha="center", va="center")
+        plt.axis("off")
+        plt.savefig("static/domain_pie.png")
+        plt.close()
+    
     # Bar chart
-    plt.figure(figsize=(8,5))
-    plt.bar(labels, scores, color="skyblue", edgecolor="black")
-    plt.title("Domain-wise Scores")
-    plt.xlabel("Domains")
-    plt.ylabel("Score (%)")
-    plt.xticks(rotation=30, ha="right")
-    plt.tight_layout()
-    plt.savefig("static/domain_bar.png")
-    plt.close()
+    if scores and sum(scores) > 0:
+        plt.figure(figsize=(8,5))
+        plt.bar(labels, scores, color="skyblue", edgecolor="black")
+        plt.title("Domain-wise Scores")
+        plt.xlabel("Domains")
+        plt.ylabel("Score (%)")
+        plt.xticks(rotation=30, ha="right")
+        plt.tight_layout()
+        plt.savefig("static/domain_bar.png")
+        plt.close()
+    else:
+        plt.figure(figsize=(8,5))
+        plt.text(0.5, 0.5, "No data available", ha="center", va="center")
+        plt.axis("off")
+        plt.savefig("static/domain_bar.png")
+        plt.close()
 
     # ---------------- INSIGHTS ----------------
     avg_similarity = sum(r["similarity"] for r in results) / len(results)
@@ -293,12 +307,21 @@ def evaluate():
     insights = []
     if avg_similarity < 0.5:
         insights.append("Your answers lack conceptual clarity.")
+    else:
+        insights.append("There is clarity on concepts. Try to more use technical language.")
     if avg_keywords < 2:
         insights.append("Use more technical keywords.")
+    else:
+        insights.append("Good use of technical keywords!")
     if avg_filler > 2:
         insights.append("Reduce filler words (um, like, basically).")
+    else:
+        insights.append("Good Explanation in less stammer! Love the confidence")
     if avg_length < 8:
         insights.append("Try to elaborate your answers more.")
+    else:
+        insights.append("Well elaborated answers! good!!")
+    	
 
     # ---------------- RENDER ----------------
     return render_template("result.html",
