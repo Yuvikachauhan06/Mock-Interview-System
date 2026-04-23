@@ -1,0 +1,162 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(to right, #ece9e6, #ffffff);
+  margin: 0;
+  padding: 0;
+}
+
+/* Center container */
+.container {
+  width: 90%;
+  max-width: 700px;
+  margin: 60px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+
+.subtitle {
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 14px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.question-item {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.question-text {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.domain-tag {
+  display: inline-block;
+  background: #e0e0e0;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 12px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: #555;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+/* Buttons */
+button {
+  width: 100%;
+  padding: 12px;
+  background: #4CAF50;
+  border: none;
+  color: white;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #43a047;
+}
+a.btn {
+  display: block;
+  text-align: center;
+  padding: 12px;
+  background: #4CAF50;;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  margin: 10px 0;
+  transition: 0.3s;
+}
+a.btn:hover {
+  background: #43a047;
+}
+/* Inputs */
+input, textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+/* Card style */
+.card {
+  background: #fafafa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border-left: 5px solid #4CAF50;
+}
+.score {
+  font-weight: bold;
+  color: #4CAF50;
+}
+/* Center text */
+.center {
+  text-align: center;
+}
+.progress {
+  background: #f0f0f0;
+  height: 4px;
+  margin-bottom: 25px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background: #4CAF50;
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.question-number {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 8px;
+}

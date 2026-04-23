@@ -1,15 +1,16 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, redirect, session
+from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 import pdfplumber
 import pickle
 import re
 import matplotlib.pyplot as plt
-
+from database import get_db_connection
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
-
+app.secret_key = "super_secret_key"
 # ---------------- LOAD MODEL ----------------
 model = pickle.load(open("model.pkl", "rb"))
 
@@ -140,14 +141,61 @@ def technical_depth(text):
 def keyword_match(user, keywords):
     user_tokens = set(re.findall(r"\w+", user.lower()))
     return sum(1 for k in keywords if k.strip().lower() in user_tokens)
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form["name"]
+        email = request.form["email"]
+        password = generate_password_hash(request.form["password"])
 
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+                (name, email, password)
+            )
+            conn.commit()
+        except:
+            return "User already exists"
+
+        return redirect("/login")
+
+    return render_template("register.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form["email"]
+        password = request.form["password"]
+
+        conn = get_db_connection()
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ?", (email,)
+        ).fetchone()
+
+        if user and check_password_hash(user["password"], password):
+            session["user_id"] = user["id"]
+            return redirect("/dashboard")
+
+        return "Invalid credentials"
+
+    return render_template("login.html")
+
+@app.route("/dashboard")
+def dashboard():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    return render_template("dashboard.html")
 # ---------------- ROUTES ----------------
 @app.route("/")
 def home():
-    return render_template("upload.html")
+    return redirect("/login")
 
 @app.route("/upload", methods=["POST"])
 def upload():
+    if "user_id" not in session:
+        return redirect("/login")
     file = request.files["resume"]
     role = request.form.get("role")
     num_q = int(request.form.get("num_q", 5))
@@ -170,9 +218,36 @@ def upload():
 
     questions = select_questions(df, weights, num_q)
     return render_template("questions.html", questions=questions)
+@app.route("/progress")
+def progress():
+    if "user_id" not in session:
+        return redirect("/login")
 
+    conn = get_db_connection()
+    results = conn.execute(
+        "SELECT * FROM results WHERE user_id = ? ORDER BY date",
+        (session["user_id"],)
+    ).fetchall()
+
+    # Extract data for graph
+    scores = [r["score"] for r in results]
+    dates = [r["date"] for r in results]
+
+    return render_template(
+        "progress.html",
+        results=results,
+        scores=scores,
+        dates=dates
+    )
+@app.route("/upload", methods=["GET"])
+def upload_page():
+    if "user_id" not in session:
+        return redirect("/login")
+    return render_template("upload.html")
 @app.route("/evaluate", methods=["POST"])
 def evaluate():
+    if "user_id" not in session:
+        return redirect("/login")
     results = []
     domain_scores = {}
 
@@ -227,11 +302,20 @@ def evaluate():
         domain_scores[domain].append(prediction)
 
         i += 1
+
         # ---------------- OVERALL SCORE ----------------
 
     score_map = {"Good": 1, "Average": 0.5, "Poor": 0}
     total_score = sum(score_map[r["prediction"]] for r in results)
     overall_score = round((total_score / len(results)) * 100, 2)
+    # -------- SAVE RESULT --------
+    conn = get_db_connection()
+    conn.execute(
+    "INSERT INTO results (user_id, score) VALUES (?, ?)",
+    (session["user_id"], overall_score)
+)
+    conn.commit()
+    conn.close()
     
     # ---------------- DOMAIN ANALYSIS ----------------
     analysis = {}
@@ -331,6 +415,11 @@ def evaluate():
                            insights=insights,
                            domain_chart=domain_chart,
                            domain_suggestions=domain_suggestions)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":

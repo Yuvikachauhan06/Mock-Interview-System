@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Progress</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <h2>Your Progress</h2>
+    <canvas id="scoreChart" height="100"></canvas>
+    <br>
+    {% if results %}
+      {% for r in results %}
+        <div class="card">
+          <p class="score">Score: {{ r['score'] }}%</p>
+          <p>Date: {{ r['date'] }}</p>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No tests taken yet.</p>
+    {% endif %}
+
+    <a href="/dashboard" class="btn">⬅ Back</a>
+  </div>
+ <script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const scoreData = {{ scores | tojson }};
+  const dateData = {{ dates | tojson }};
+
+  const canvas = document.getElementById('scoreChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dateData,
+      datasets: [{
+        label: 'Score (%)',
+        data: scoreData,
+        borderWidth: 2,
+        tension: 0.3
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100
+        }
+      }
+    }
+  });
+
+});
+</script>
+</body>
+</html>
