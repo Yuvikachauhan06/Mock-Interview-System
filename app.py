@@ -5,14 +5,21 @@ import pdfplumber
 import pickle
 import re
 import matplotlib.pyplot as plt
+import os
+from datetime import datetime
 from database import get_db_connection
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
+
 # ---------------- LOAD MODEL ----------------
-model = pickle.load(open("model.pkl", "rb"))
+try:
+    model = pickle.load(open("model.pkl", "rb"))
+except:
+    print("Warning: model.pkl not found. Please train the model first.")
+    model = None
 
 # ---------------- ROLE WEIGHTS ----------------
 ROLE_WEIGHTS = {
@@ -73,21 +80,21 @@ def extract_text_from_pdf(file):
 def extract_skills(text):
     skills = []
     mapping = {
-        "DSA": ["dsa", "data structures"],
+        "DSA": ["dsa", "data structures", "algorithm"],
         "Python": ["python"],
         "Java": ["java"],
         "C++": ["c++", "cpp"],
-        "AIML": ["machine learning", "ai"],
-        "Data Science": ["statistics", "pandas"],
-        "DBMS": ["sql", "database", "dbms"],
-        "Web Development": ["html", "css", "javascript", "react"],
-        "Backend Development": ["django", "flask", "node", "api"],
-        "Operating Systems": ["os", "process", "thread"],
-        "Computer Networks": ["network", "tcp", "ip"],
-        "System Design": ["scalability", "architecture"],
-        "Cloud & DevOps": ["aws", "docker", "kubernetes"],
-        "Cybersecurity": ["security", "encryption"],
-        "OOPS": ["oops", "object oriented"]
+        "AIML": ["machine learning", "ai", "artificial intelligence"],
+        "Data Science": ["statistics", "pandas", "data analysis"],
+        "DBMS": ["sql", "database", "dbms", "mysql", "postgresql"],
+        "Web Development": ["html", "css", "javascript", "react", "angular"],
+        "Backend Development": ["django", "flask", "node", "api", "rest"],
+        "Operating Systems": ["os", "process", "thread", "linux"],
+        "Computer Networks": ["network", "tcp", "ip", "dns", "http"],
+        "System Design": ["scalability", "architecture", "microservices"],
+        "Cloud & DevOps": ["aws", "docker", "kubernetes", "jenkins", "ci/cd"],
+        "Cybersecurity": ["security", "encryption", "authentication"],
+        "OOPS": ["oops", "object oriented", "inheritance"]
     }
     for domain, keys in mapping.items():
         if any(k.lower() in text for k in keys):
@@ -107,7 +114,7 @@ def normalize_weights(role_weights, skills):
 def select_questions(df, weights, total_q):
     questions = []
     for domain, weight in weights.items():
-        n = max(1, int(weight * total_q))  # normalized weight
+        n = max(1, int(weight * total_q))
         domain_q = df[df["domain"] == domain]
         if not domain_q.empty:
             sampled = domain_q.sample(min(n, len(domain_q)))
@@ -126,14 +133,15 @@ def get_similarity(a, b):
 
 # -------- FILLER WORD COUNT --------
 def count_fillers(text):
-    fillers = ["um", "uh", "like", "you know", "basically"]
+    fillers = ["um", "uh", "like", "you know", "basically", "actually"]
     return sum(text.lower().count(f) for f in fillers)
 
 # -------- TECHNICAL DEPTH --------
 def technical_depth(text):
     tech_words = [
         "algorithm", "complexity", "api", "database",
-        "model", "training", "optimization", "scalability"
+        "model", "training", "optimization", "scalability",
+        "framework", "architecture", "deployment"
     ]
     return sum(word in text.lower() for word in tech_words)
 
@@ -141,6 +149,12 @@ def technical_depth(text):
 def keyword_match(user, keywords):
     user_tokens = set(re.findall(r"\w+", user.lower()))
     return sum(1 for k in keywords if k.strip().lower() in user_tokens)
+
+# ---------------- ROUTES ----------------
+@app.route("/")
+def home():
+    return redirect("/login")
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -155,10 +169,11 @@ def register():
                 (name, email, password)
             )
             conn.commit()
-        except:
-            return "User already exists"
-
-        return redirect("/login")
+            conn.close()
+            return redirect("/login")
+        except Exception as e:
+            conn.close()
+            return f"User already exists or error: {e}"
 
     return render_template("register.html")
 
@@ -172,9 +187,11 @@ def login():
         user = conn.execute(
             "SELECT * FROM users WHERE email = ?", (email,)
         ).fetchone()
+        conn.close()
 
         if user and check_password_hash(user["password"], password):
             session["user_id"] = user["id"]
+            session["username"] = user["name"]
             return redirect("/dashboard")
 
         return "Invalid credentials"
@@ -185,17 +202,35 @@ def login():
 def dashboard():
     if "user_id" not in session:
         return redirect("/login")
+    
+    # Get username from session or database
+    if "username" not in session:
+        conn = get_db_connection()
+        user = conn.execute(
+            "SELECT name FROM users WHERE id = ?", (session["user_id"],)
+        ).fetchone()
+        conn.close()
+        if user:
+            session["username"] = user["name"]
+        else:
+            return redirect("/login")
+    
+    return render_template("dashboard.html", username=session["username"])
 
-    return render_template("dashboard.html")
-# ---------------- ROUTES ----------------
-@app.route("/")
-def home():
-    return redirect("/login")
+@app.route("/upload", methods=["GET"])
+def upload_page():
+    if "user_id" not in session:
+        return redirect("/login")
+    return render_template("upload.html")
 
 @app.route("/upload", methods=["POST"])
 def upload():
     if "user_id" not in session:
         return redirect("/login")
+    
+    if "resume" not in request.files:
+        return "No file uploaded"
+    
     file = request.files["resume"]
     role = request.form.get("role")
     num_q = int(request.form.get("num_q", 5))
@@ -203,21 +238,25 @@ def upload():
     text = extract_text_from_pdf(file)
     skills = extract_skills(text)
     if not skills:
-        skills = ["Python"]   # fallback
+        skills = ["Python", "DSA"]   # fallback
 
     role_weights = ROLE_WEIGHTS[role]
     weights = normalize_weights(role_weights, skills)
 
     df = pd.read_csv("questions_dataset.csv", encoding="utf-8")
-    df.rename(columns={
-        "Domain": "domain",
-        "Question": "question",
-        "Answer": "ideal_answer",
-        "Keywords": "keywords"
-    }, inplace=True)
-
+    
+    # Make sure columns exist
+    if "Domain" in df.columns:
+        df.rename(columns={
+            "Domain": "domain",
+            "Question": "question",
+            "Answer": "ideal_answer",
+            "Keywords": "keywords"
+        }, inplace=True)
+    
     questions = select_questions(df, weights, num_q)
-    return render_template("questions.html", questions=questions)
+    return render_template("questions.html", questions=questions, role=role)
+
 @app.route("/progress")
 def progress():
     if "user_id" not in session:
@@ -228,26 +267,52 @@ def progress():
         "SELECT * FROM results WHERE user_id = ? ORDER BY date",
         (session["user_id"],)
     ).fetchall()
+    conn.close()
 
-    # Extract data for graph
     scores = [r["score"] for r in results]
     dates = [r["date"] for r in results]
+
+    # Ensure static directory exists
+    static_dir = os.path.join(app.root_path, "static")
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    
+    chart_path = os.path.join(static_dir, "progress_line.png")
+
+    # Generate line chart with Matplotlib
+    if scores:
+        plt.figure(figsize=(8,5))
+        plt.plot(dates, scores, marker='o', color='blue', linewidth=2)
+        plt.title("Progress Over Time")
+        plt.xlabel("Date")
+        plt.ylabel("Score (%)")
+        plt.ylim(0, 100)
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig(chart_path)
+        plt.close()
+    else:
+        # fallback chart if no data
+        plt.figure(figsize=(8,5))
+        plt.text(0.5, 0.5, "No progress data available", ha="center", va="center", fontsize=16)
+        plt.axis("off")
+        plt.savefig(chart_path)
+        plt.close()
 
     return render_template(
         "progress.html",
         results=results,
         scores=scores,
-        dates=dates
+        dates=dates,
+        chart_filename="progress_line.png"
     )
-@app.route("/upload", methods=["GET"])
-def upload_page():
-    if "user_id" not in session:
-        return redirect("/login")
-    return render_template("upload.html")
+
 @app.route("/evaluate", methods=["POST"])
 def evaluate():
     if "user_id" not in session:
         return redirect("/login")
+    
     results = []
     domain_scores = {}
 
@@ -269,22 +334,29 @@ def evaluate():
         depth = technical_depth(user)
 
         # -------- MODEL PREDICTION --------
-        
-        features = pd.DataFrame(
-            [[similarity, keyword_score, length, filler, depth]],
-            columns=[
-                "similarity_score",
-                "keyword_match_score",
-                "answer_length",
-                "filler_count",
-                "technical_depth_score"
-            ]
-        )
-        prediction = model.predict(features)[0]
-        proba = model.predict_proba(features)[0]
-        confidence = max(proba)
-
-        
+        if model:
+            features = pd.DataFrame(
+                [[similarity, keyword_score, length, filler, depth]],
+                columns=[
+                    "similarity_score",
+                    "keyword_match_score",
+                    "answer_length",
+                    "filler_count",
+                    "technical_depth_score"
+                ]
+            )
+            prediction = model.predict(features)[0]
+            proba = model.predict_proba(features)[0]
+            confidence = max(proba)
+        else:
+            # Fallback if model not available
+            if similarity > 0.6 and keyword_score > 2:
+                prediction = "Good"
+            elif similarity > 0.3 and keyword_score > 1:
+                prediction = "Average"
+            else:
+                prediction = "Poor"
+            confidence = 0.7
 
         results.append({
             "domain": domain,
@@ -303,17 +375,17 @@ def evaluate():
 
         i += 1
 
-        # ---------------- OVERALL SCORE ----------------
-
+    # ---------------- OVERALL SCORE ----------------
     score_map = {"Good": 1, "Average": 0.5, "Poor": 0}
     total_score = sum(score_map[r["prediction"]] for r in results)
     overall_score = round((total_score / len(results)) * 100, 2)
+    
     # -------- SAVE RESULT --------
     conn = get_db_connection()
     conn.execute(
-    "INSERT INTO results (user_id, score) VALUES (?, ?)",
-    (session["user_id"], overall_score)
-)
+        "INSERT INTO results (user_id, score, date) VALUES (?, ?, ?)",
+        (session["user_id"], overall_score, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    )
     conn.commit()
     conn.close()
     
@@ -349,19 +421,23 @@ def evaluate():
     labels = list(domain_chart.keys())
     scores = list(domain_chart.values())
 
+    static_dir = os.path.join(app.root_path, "static")
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+
     # Pie chart
     if scores and sum(scores) > 0:
         plt.figure(figsize=(6,6))
         plt.pie(scores, labels=labels, autopct='%1.1f%%', startangle=140)
         plt.title("Domain-wise Performance")
         plt.tight_layout()
-        plt.savefig("static/domain_pie.png")
+        plt.savefig(os.path.join(static_dir, "domain_pie.png"))
         plt.close()
     else:
         plt.figure(figsize=(6,6))
         plt.text(0.5, 0.5, "No data available", ha="center", va="center")
         plt.axis("off")
-        plt.savefig("static/domain_pie.png")
+        plt.savefig(os.path.join(static_dir, "domain_pie.png"))
         plt.close()
     
     # Bar chart
@@ -373,13 +449,13 @@ def evaluate():
         plt.ylabel("Score (%)")
         plt.xticks(rotation=30, ha="right")
         plt.tight_layout()
-        plt.savefig("static/domain_bar.png")
+        plt.savefig(os.path.join(static_dir, "domain_bar.png"))
         plt.close()
     else:
         plt.figure(figsize=(8,5))
         plt.text(0.5, 0.5, "No data available", ha="center", va="center")
         plt.axis("off")
-        plt.savefig("static/domain_bar.png")
+        plt.savefig(os.path.join(static_dir, "domain_bar.png"))
         plt.close()
 
     # ---------------- INSIGHTS ----------------
@@ -392,20 +468,19 @@ def evaluate():
     if avg_similarity < 0.5:
         insights.append("Your answers lack conceptual clarity.")
     else:
-        insights.append("There is clarity on concepts. Try to more use technical language.")
+        insights.append("There is clarity on concepts. Try to use more technical language.")
     if avg_keywords < 2:
-        insights.append("Use more technical keywords.")
+        insights.append("Use more technical keywords in your answers.")
     else:
         insights.append("Good use of technical keywords!")
     if avg_filler > 2:
         insights.append("Reduce filler words (um, like, basically).")
     else:
-        insights.append("Good Explanation in less stammer! Love the confidence")
+        insights.append("Good explanation with minimal stammer! Love the confidence!")
     if avg_length < 8:
         insights.append("Try to elaborate your answers more.")
     else:
-        insights.append("Well elaborated answers! good!!")
-    	
+        insights.append("Well elaborated answers! Good job!")
 
     # ---------------- RENDER ----------------
     return render_template("result.html",
