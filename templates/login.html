@@ -1,23 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Login</title>
+  <title>Mock Interview System - Login</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
   <div class="container">
-    <h2>Login</h2>
+    <h2>Mock Interview System</h2>
+    <p class="subtitle">Login to continue your interview journey</p>
 
     <form method="POST">
-      <input type="email" name="email" placeholder="Email" required>
-      <input type="password" name="password" placeholder="Password" required>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" placeholder="Enter your email" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" placeholder="Enter your password" required>
+      </div>
 
       <button type="submit">Login</button>
     </form>
 
     <p class="center">
-      New user? <a href="/register">Register here</a>
+      New user? <a href="/register" class="btn">Register here</a>
     </p>
   </div>
 </body>
