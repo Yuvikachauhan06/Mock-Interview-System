@@ -6,6 +6,7 @@ import pickle
 import re
 import matplotlib.pyplot as plt
 import os
+import numpy as np
 from datetime import datetime
 from database import get_db_connection
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -14,14 +15,43 @@ from sklearn.metrics.pairwise import cosine_similarity
 app = Flask(__name__)
 app.secret_key = "super_secret_key"
 
-# ---------------- LOAD MODEL ----------------
+# LOGISTIC REGRESSION CLASS
+class LogisticRegression:
+    def __init__(self, lr=0.01, epochs=2000):
+        self.lr = lr
+        self.epochs = epochs
+
+    def softmax(self, z):
+        exp = np.exp(z - np.max(z, axis=1, keepdims=True))
+        return exp / np.sum(exp, axis=1, keepdims=True)
+
+    def predict(self, X):
+        probs = self.predict_proba(X)
+        return np.argmax(probs, axis=1)
+
+    def predict_proba(self, X):
+        linear = np.dot(X, self.W) + self.b
+        return self.softmax(linear)
+
+# LOAD MODEL AND SCALING PARAMETERS 
+model = None
+mean = None
+std = None
+
 try:
     model = pickle.load(open("model.pkl", "rb"))
-except:
-    print("Warning: model.pkl not found. Please train the model first.")
-    model = None
+    mean = pickle.load(open("mean.pkl", "rb"))
+    std = pickle.load(open("std.pkl", "rb"))
+    print(" Model and scaling parameters loaded successfully!")
+    print(f"   Features: similarity, keywords, length, filler, depth")
+except FileNotFoundError as e:
+    print(f" File not found: {e}")
+    print("   Please run train_model.py first to create model files")
+except Exception as e:
+    print(f" Error loading model: {e}")
+    print("   Running in fallback mode")
 
-# ---------------- ROLE WEIGHTS ----------------
+# ROLE WEIGHTS 
 ROLE_WEIGHTS = {
     "Software Engineer": {
         "DSA": 40, "Python": 10, "Java": 5, "C++": 5,
@@ -68,7 +98,7 @@ ROLE_WEIGHTS = {
     }
 }
 
-# ---------------- PDF TEXT ----------------
+# PDF TEXT EXTRACTION
 def extract_text_from_pdf(file):
     text = ""
     with pdfplumber.open(file) as pdf:
@@ -76,7 +106,7 @@ def extract_text_from_pdf(file):
             text += page.extract_text() or ""
     return text.lower()
 
-# ---------------- SKILL EXTRACTION ----------------
+#  SKILL EXTRACTION 
 def extract_skills(text):
     skills = []
     mapping = {
@@ -99,18 +129,18 @@ def extract_skills(text):
     for domain, keys in mapping.items():
         if any(k.lower() in text for k in keys):
             skills.append(domain)
-    return skills
+    return list(set(skills))
 
-# ---------------- NORMALIZE ----------------
+# NORMALIZE WEIGHTS 
 def normalize_weights(role_weights, skills):
     filtered = {k: v for k, v in role_weights.items() if k in skills}
-    if not filtered:  # fallback
+    if not filtered:
         total = sum(role_weights.values())
         return {k: v/total for k, v in role_weights.items()}
     total = sum(filtered.values())
     return {k: v/total for k, v in filtered.items()}
 
-# ---------------- SELECT QUESTIONS ----------------
+#  SELECT QUESTIONS
 def select_questions(df, weights, total_q):
     questions = []
     for domain, weight in weights.items():
@@ -125,32 +155,37 @@ def select_questions(df, weights, total_q):
         questions.extend(extra)
     return questions[:total_q]
 
-# ---------------- SIMILARITY ----------------
-def get_similarity(a, b):
-    tfidf = TfidfVectorizer()
-    vec = tfidf.fit_transform([a, b])
-    return cosine_similarity(vec[0:1], vec[1:2])[0][0]
+#  SIMILARITY SCORE 
+def get_similarity(user_answer, ideal_answer):
+    if not user_answer or not ideal_answer:
+        return 0.0
+    tfidf = TfidfVectorizer(stop_words='english')
+    vectors = tfidf.fit_transform([user_answer, ideal_answer])
+    return cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
 
-# -------- FILLER WORD COUNT --------
+#  FILLER WORD COUNT 
 def count_fillers(text):
-    fillers = ["um", "uh", "like", "you know", "basically", "actually"]
+    fillers = ["um", "uh", "like", "you know", "basically", "actually", "sort of", "kind of"]
     return sum(text.lower().count(f) for f in fillers)
 
-# -------- TECHNICAL DEPTH --------
+#  TECHNICAL DEPTH 
 def technical_depth(text):
     tech_words = [
-        "algorithm", "complexity", "api", "database",
-        "model", "training", "optimization", "scalability",
-        "framework", "architecture", "deployment"
+        "algorithm", "complexity", "api", "database", "model", "training",
+        "optimization", "scalability", "framework", "architecture", "deployment",
+        "recursion", "dynamic programming", "hashmap", "pointer", "cache",
+        "concurrency", "thread", "inheritance", "polymorphism", "encapsulation"
     ]
     return sum(word in text.lower() for word in tech_words)
 
-# -------- KEYWORD MATCH --------
-def keyword_match(user, keywords):
-    user_tokens = set(re.findall(r"\w+", user.lower()))
+#  KEYWORD MATCH 
+def keyword_match(user_answer, keywords):
+    if not keywords:
+        return 0
+    user_tokens = set(re.findall(r"\w+", user_answer.lower()))
     return sum(1 for k in keywords if k.strip().lower() in user_tokens)
 
-# ---------------- ROUTES ----------------
+#  ROUTES 
 @app.route("/")
 def home():
     return redirect("/login")
@@ -203,7 +238,6 @@ def dashboard():
     if "user_id" not in session:
         return redirect("/login")
     
-    # Get username from session or database
     if "username" not in session:
         conn = get_db_connection()
         user = conn.execute(
@@ -238,14 +272,13 @@ def upload():
     text = extract_text_from_pdf(file)
     skills = extract_skills(text)
     if not skills:
-        skills = ["Python", "DSA"]   # fallback
+        skills = ["Python", "DSA"]
 
     role_weights = ROLE_WEIGHTS[role]
     weights = normalize_weights(role_weights, skills)
 
     df = pd.read_csv("questions_dataset.csv", encoding="utf-8")
     
-    # Make sure columns exist
     if "Domain" in df.columns:
         df.rename(columns={
             "Domain": "domain",
@@ -255,6 +288,7 @@ def upload():
         }, inplace=True)
     
     questions = select_questions(df, weights, num_q)
+    
     return render_template("questions.html", questions=questions, role=role)
 
 @app.route("/progress")
@@ -272,14 +306,12 @@ def progress():
     scores = [r["score"] for r in results]
     dates = [r["date"] for r in results]
 
-    # Ensure static directory exists
     static_dir = os.path.join(app.root_path, "static")
     if not os.path.exists(static_dir):
         os.makedirs(static_dir)
     
     chart_path = os.path.join(static_dir, "progress_line.png")
 
-    # Generate line chart with Matplotlib
     if scores:
         plt.figure(figsize=(8,5))
         plt.plot(dates, scores, marker='o', color='blue', linewidth=2)
@@ -293,7 +325,6 @@ def progress():
         plt.savefig(chart_path)
         plt.close()
     else:
-        # fallback chart if no data
         plt.figure(figsize=(8,5))
         plt.text(0.5, 0.5, "No progress data available", ha="center", va="center", fontsize=16)
         plt.axis("off")
@@ -326,37 +357,46 @@ def evaluate():
         keywords_raw = request.form.get(f"keywords{i}")
         keywords = keywords_raw.split(",") if keywords_raw else []
 
-        # -------- FEATURE EXTRACTION --------
+        # Feature extraction
         similarity = get_similarity(user, ideal)
         keyword_score = keyword_match(user, keywords)
         length = len(user.split())
         filler = count_fillers(user)
         depth = technical_depth(user)
 
-        # -------- MODEL PREDICTION --------
-        if model:
-            features = pd.DataFrame(
-                [[similarity, keyword_score, length, filler, depth]],
-                columns=[
-                    "similarity_score",
-                    "keyword_match_score",
-                    "answer_length",
-                    "filler_count",
-                    "technical_depth_score"
-                ]
-            )
-            prediction = model.predict(features)[0]
-            proba = model.predict_proba(features)[0]
-            confidence = max(proba)
+        # Model prediction
+        if model is not None and mean is not None and std is not None:
+            try:
+                features = np.array([[similarity, keyword_score, length, filler, depth]])
+                features_scaled = (features - mean) / std
+                
+                proba = model.predict_proba(features_scaled)[0]
+                confidence = max(proba)
+                prediction_num = model.predict(features_scaled)[0]
+                reverse_map = {0: "Poor", 1: "Average", 2: "Good"}
+                prediction = reverse_map[prediction_num]
+            except Exception as e:
+                print(f"Prediction error: {e}")
+                # Fallback
+                if similarity > 0.6 and keyword_score > 2:
+                    prediction = "Good"
+                elif similarity > 0.3 and keyword_score > 1:
+                    prediction = "Average"
+                else:
+                    prediction = "Poor"
+                confidence = 0.7
         else:
-            # Fallback if model not available
+            # Fallback when model not available
             if similarity > 0.6 and keyword_score > 2:
                 prediction = "Good"
+                confidence = 0.7 + (similarity * 0.2)
             elif similarity > 0.3 and keyword_score > 1:
                 prediction = "Average"
+                confidence = 0.5 + (similarity * 0.3)
             else:
                 prediction = "Poor"
-            confidence = 0.7
+                confidence = 0.4 + (similarity * 0.2)
+            confidence = min(confidence, 0.95)
 
         results.append({
             "domain": domain,
@@ -375,12 +415,15 @@ def evaluate():
 
         i += 1
 
-    # ---------------- OVERALL SCORE ----------------
+    # Overall score
     score_map = {"Good": 1, "Average": 0.5, "Poor": 0}
     total_score = sum(score_map[r["prediction"]] for r in results)
     overall_score = round((total_score / len(results)) * 100, 2)
     
-    # -------- SAVE RESULT --------
+    # Overall confidence
+    overall_confidence = sum(r["confidence"] for r in results) / len(results)
+    
+    # Save to database
     conn = get_db_connection()
     conn.execute(
         "INSERT INTO results (user_id, score, date) VALUES (?, ?, ?)",
@@ -389,7 +432,7 @@ def evaluate():
     conn.commit()
     conn.close()
     
-    # ---------------- DOMAIN ANALYSIS ----------------
+    # Domain analysis
     analysis = {}
     for domain, preds in domain_scores.items():
         avg = sum(score_map[p] for p in preds) / len(preds)
@@ -400,7 +443,7 @@ def evaluate():
         else:
             analysis[domain] = "Weak"
 
-    # ---------------- DOMAIN SUGGESTIONS ----------------
+    # Domain suggestions
     domain_suggestions = {}
     for domain, preds in domain_scores.items():
         avg = sum(score_map[p] for p in preds) / len(preds)
@@ -411,39 +454,30 @@ def evaluate():
         else:
             domain_suggestions[domain] = "Keep up the good work!"
 
-    # ---------------- DOMAIN CHART DATA ----------------
+    # Domain chart data
     domain_chart = {}
     for domain, preds in domain_scores.items():
         avg = sum(score_map[p] for p in preds) / len(preds)
         domain_chart[domain] = round(avg * 100, 2)
     
-    # ---------------- GENERATE CHARTS ----------------
+    # Generate charts
     labels = list(domain_chart.keys())
-    scores = list(domain_chart.values())
+    scores_list = list(domain_chart.values())
 
     static_dir = os.path.join(app.root_path, "static")
     if not os.path.exists(static_dir):
         os.makedirs(static_dir)
 
-    # Pie chart
-    if scores and sum(scores) > 0:
+    if scores_list and sum(scores_list) > 0:
         plt.figure(figsize=(6,6))
-        plt.pie(scores, labels=labels, autopct='%1.1f%%', startangle=140)
+        plt.pie(scores_list, labels=labels, autopct='%1.1f%%', startangle=140)
         plt.title("Domain-wise Performance")
         plt.tight_layout()
         plt.savefig(os.path.join(static_dir, "domain_pie.png"))
         plt.close()
-    else:
-        plt.figure(figsize=(6,6))
-        plt.text(0.5, 0.5, "No data available", ha="center", va="center")
-        plt.axis("off")
-        plt.savefig(os.path.join(static_dir, "domain_pie.png"))
-        plt.close()
-    
-    # Bar chart
-    if scores and sum(scores) > 0:
+        
         plt.figure(figsize=(8,5))
-        plt.bar(labels, scores, color="skyblue", edgecolor="black")
+        plt.bar(labels, scores_list, color="skyblue", edgecolor="black")
         plt.title("Domain-wise Scores")
         plt.xlabel("Domains")
         plt.ylabel("Score (%)")
@@ -451,14 +485,8 @@ def evaluate():
         plt.tight_layout()
         plt.savefig(os.path.join(static_dir, "domain_bar.png"))
         plt.close()
-    else:
-        plt.figure(figsize=(8,5))
-        plt.text(0.5, 0.5, "No data available", ha="center", va="center")
-        plt.axis("off")
-        plt.savefig(os.path.join(static_dir, "domain_bar.png"))
-        plt.close()
 
-    # ---------------- INSIGHTS ----------------
+    # Insights
     avg_similarity = sum(r["similarity"] for r in results) / len(results)
     avg_keywords = sum(r["keywords"] for r in results) / len(results)
     avg_filler = sum(r["filler"] for r in results) / len(results)
@@ -466,26 +494,36 @@ def evaluate():
 
     insights = []
     if avg_similarity < 0.5:
-        insights.append("Your answers lack conceptual clarity.")
+        insights.append("Your answers lack conceptual clarity. Review the ideal answers for better understanding.")
     else:
-        insights.append("There is clarity on concepts. Try to use more technical language.")
+        insights.append("Good conceptual clarity! Try to use more technical language to improve further.")
+    
     if avg_keywords < 2:
-        insights.append("Use more technical keywords in your answers.")
+        insights.append("Use more technical keywords in your answers. This shows deeper understanding.")
     else:
-        insights.append("Good use of technical keywords!")
+        insights.append("Excellent use of technical keywords! Keep building on this foundation.")
+    
     if avg_filler > 2:
-        insights.append("Reduce filler words (um, like, basically).")
+        insights.append("Reduce filler words (um, like, basically). Practice speaking more confidently.")
     else:
-        insights.append("Good explanation with minimal stammer! Love the confidence!")
+        insights.append("Great confidence in your answers! Minimal filler words shows preparation.")
+    
     if avg_length < 8:
-        insights.append("Try to elaborate your answers more.")
+        insights.append("Elaborate your answers more. Adding examples and explanations improves quality.")
     else:
-        insights.append("Well elaborated answers! Good job!")
+        insights.append("Well-structured answers with good detail! Keep up the thorough explanations.")
+    
+    if overall_confidence > 80:
+        insights.append(f"Model is very confident ({overall_confidence:.1f}%) in evaluating your answers.")
+    elif overall_confidence > 60:
+        insights.append(f"Model is moderately confident ({overall_confidence:.1f}%) in its evaluation.")
+    else:
+        insights.append(f"Model confidence is lower ({overall_confidence:.1f}%). Some answers may need review.")
 
-    # ---------------- RENDER ----------------
     return render_template("result.html",
                            results=results,
                            overall_score=overall_score,
+                           overall_confidence=round(overall_confidence, 2),
                            analysis=analysis,
                            insights=insights,
                            domain_chart=domain_chart,
@@ -496,6 +534,5 @@ def logout():
     session.clear()
     return redirect("/login")
 
-# ---------------- RUN ----------------
 if __name__ == "__main__":
     app.run(debug=True)

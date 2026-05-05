@@ -199,12 +199,47 @@
         color: black;
       }
     }
+    /* Action buttons container */
+.action-buttons {
+  margin-top: 40px;
+  text-align: center;
+}
+
+/* Button styling (same as dashboard) */
+.btn {
+  display: block;
+  width: 60%;
+  margin: 10px auto;
+  padding: 12px;
+  background: #4CAF50;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: 0.3s;
+  text-align: center;
+}
+
+.btn:hover {
+  background: #43a047;
+}
+
+/* Logout button */
+.btn-red {
+  background: #f44336;
+}
+
+.btn-red:hover {
+  background: #d32f2f;
+}
   </style>
+  
 </head>
 <body>
 
 <div class="container">
   <h2>Interview Results</h2>
+
 
   <!-- Overall Score -->
   <div class="score">Overall Score: {{ overall_score }}%</div>
@@ -282,6 +317,11 @@
       <img src="{{ url_for('static', filename='domain_bar.png') }}" alt="Bar Chart">
     </div>
   </div>
+  <div class="action-buttons">
+    <a href="/dashboard" class="btn">Dashboard</a>
+    <a href="/progress" class="btn">View Progress</a>
+    <a href="/logout" class="btn btn-red">Logout</a>
+</div>
 </div>
 
 </body>
